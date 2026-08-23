@@ -1,0 +1,18 @@
+# Build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+
+# The sample's intermediate compile directory; the JAR beside it is checked in.
+samples/dodger/build/
+
+# Frame dumps written by the session tests
+frames/
+
+# IDE
+.vs/
+.idea/
+*.swp

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>JMobile.Tests</RootNamespace>
+    <AssemblyName>JMobile.Tests</AssemblyName>
+    <Description>Self-hosted test runner (no external dependencies) covering the JVM and runtime library.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\JMobile.Core\JMobile.Core.csproj" />
+    <ProjectReference Include="..\..\src\JMobile.Runtime\JMobile.Runtime.csproj" />
+    <ProjectReference Include="..\..\src\JMobile.Emulator\JMobile.Emulator.csproj" />
+  </ItemGroup>
+
+  <!--
+    The compiled Java fixtures and the reference values a real JVM produced for them travel with
+    the test binary, so the suite runs on a machine that has no JDK installed.
+  -->
+  <ItemGroup>
+    <None Include="..\fixtures\expected.txt" Link="fixtures\expected.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\fixtures\classes\**\*.class" LinkBase="fixtures\classes">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

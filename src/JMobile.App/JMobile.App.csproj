@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>JMobile.App</RootNamespace>
+    <AssemblyName>JMobile</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationVisualStyles>true</ApplicationVisualStyles>
+    <ApplicationUseCompatibleTextRendering>false</ApplicationUseCompatibleTextRendering>
+    <Description>JMobile Emulator desktop shell (WinForms, Model-View-Presenter).</Description>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\JMobile.Core\JMobile.Core.csproj" />
+    <ProjectReference Include="..\JMobile.Runtime\JMobile.Runtime.csproj" />
+    <ProjectReference Include="..\JMobile.Emulator\JMobile.Emulator.csproj" />
+  </ItemGroup>
+
+</Project>

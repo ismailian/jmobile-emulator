@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>JMobile.Emulator</RootNamespace>
+    <AssemblyName>JMobile.Emulator</AssemblyName>
+    <Description>Emulator host: device profiles, suite loading, game library, persistence and the frontend-facing facade.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\JMobile.Core\JMobile.Core.csproj" />
+    <ProjectReference Include="..\JMobile.Runtime\JMobile.Runtime.csproj" />
+  </ItemGroup>
+
+</Project>

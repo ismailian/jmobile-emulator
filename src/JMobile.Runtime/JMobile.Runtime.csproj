@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>JMobile.Runtime</RootNamespace>
+    <AssemblyName>JMobile.Runtime</AssemblyName>
+    <Description>CLDC 1.1 / MIDP 2.0 class library implemented as native C# intrinsics, plus the software rasterizer.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\JMobile.Core\JMobile.Core.csproj" />
+  </ItemGroup>
+
+</Project>

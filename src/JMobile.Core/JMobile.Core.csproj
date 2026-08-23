@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>JMobile.Core</RootNamespace>
+    <AssemblyName>JMobile.Core</AssemblyName>
+    <Description>Java Virtual Machine: class file model, loader, verifier-lite and the bytecode interpreter.</Description>
+  </PropertyGroup>
+
+</Project>

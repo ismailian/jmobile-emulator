@@ -1,0 +1,44 @@
+<Project>
+
+  <!--
+    Shared build configuration for every project in the JMobile solution.
+    Keeping this in one place means a single edit changes the whole repo.
+  -->
+  <PropertyGroup>
+    <LangVersion>13.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningLevel>6</WarningLevel>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Product>JMobile Emulator</Product>
+    <Company>JMobile</Company>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <!--
+    Performance knobs. The interpreter is the hot path of the whole product, so we
+    opt into every codegen feature the runtime offers and allow unsafe blocks for
+    the software rasterizer's inner loops.
+  -->
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Optimize Condition="'$(Configuration)' == 'Release'">true</Optimize>
+    <TieredCompilation>true</TieredCompilation>
+    <TieredPGO>true</TieredPGO>
+    <TieredCompilationQuickJitForLoops>false</TieredCompilationQuickJitForLoops>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <RetainVMGarbageCollection>true</RetainVMGarbageCollection>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+</Project>
