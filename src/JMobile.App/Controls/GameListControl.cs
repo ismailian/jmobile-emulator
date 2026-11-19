@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Drawing.Drawing2D;
 using JMobile.Emulator.Library;
 
@@ -12,6 +13,15 @@ public sealed class GameListItem(LibraryEntry entry)
     public Bitmap? Icon { get; set; }
 }
 
+/// <summary>The orders the library can be listed in.</summary>
+public enum GameSortOrder
+{
+    RecentlyPlayed,
+    Name,
+    MostPlayed,
+    RecentlyAdded,
+}
+
 /// <summary>
 /// The scrollable list of installed games.
 /// </summary>
@@ -23,14 +33,17 @@ public sealed class GameListItem(LibraryEntry entry)
 /// </remarks>
 public sealed class GameListControl : Control
 {
-    private const int RowHeight = 58;
-    private const int IconSize = 40;
+    private const int RowHeight = 90;
+    private const int IconSize = 58;
+
+    private static readonly Font HeadingFont = new("Segoe UI", 11f);
 
     private readonly List<GameListItem> _items = [];
     private int _selectedIndex = -1;
     private int _hoveredIndex = -1;
     private int _scrollOffset;
     private string _filter = string.Empty;
+    private GameSortOrder _sortOrder = GameSortOrder.RecentlyPlayed;
 
     public GameListControl()
     {
@@ -44,6 +57,7 @@ public sealed class GameListControl : Control
 
         BackColor = Theme.Surface;
         TabStop = true;
+        Font = Theme.UiFont;
     }
 
     /// <summary>Rows currently shown, after filtering.</summary>
@@ -67,6 +81,44 @@ public sealed class GameListControl : Control
     /// <summary>Raised on double click or Enter: the user wants to play this game.</summary>
     public event Action<LibraryEntry>? ItemActivated;
 
+    /// <summary>The order rows are listed in.</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public GameSortOrder SortOrder
+    {
+        get => _sortOrder;
+        set
+        {
+            if (_sortOrder == value) return;
+
+            string? selectedId = SelectedEntry?.Id;
+            _sortOrder = value;
+            Sort();
+
+            _selectedIndex = Math.Max(0, VisibleItems.FindIndex(item => item.Entry.Id == selectedId));
+            if (VisibleItems.Count == 0) _selectedIndex = -1;
+            _scrollOffset = 0;
+            Invalidate();
+        }
+    }
+
+    private void Sort()
+    {
+        Comparison<GameListItem> comparison = _sortOrder switch
+        {
+            GameSortOrder.Name => (a, b) =>
+                StringComparer.CurrentCultureIgnoreCase.Compare(a.Entry.Title, b.Entry.Title),
+            GameSortOrder.MostPlayed => (a, b) => b.Entry.PlaySeconds.CompareTo(a.Entry.PlaySeconds),
+            GameSortOrder.RecentlyAdded => (a, b) => b.Entry.AddedAt.CompareTo(a.Entry.AddedAt),
+            _ => (a, b) => (b.Entry.LastPlayedAt ?? DateTimeOffset.MinValue)
+                .CompareTo(a.Entry.LastPlayedAt ?? DateTimeOffset.MinValue),
+        };
+
+        // A stable sort, so ties keep the library's own order.
+        List<GameListItem> sorted = [.. _items.Order(Comparer<GameListItem>.Create(comparison))];
+        _items.Clear();
+        _items.AddRange(sorted);
+    }
+
     /// <summary>Replaces the contents, preserving the selection where the same game is still present.</summary>
     public void SetItems(IEnumerable<GameListItem> items)
     {
@@ -75,6 +127,7 @@ public sealed class GameListControl : Control
         foreach (GameListItem item in _items) item.Icon?.Dispose();
         _items.Clear();
         _items.AddRange(items);
+        Sort();
 
         List<GameListItem> visible = VisibleItems;
         _selectedIndex = previousId is null
@@ -105,14 +158,10 @@ public sealed class GameListControl : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         Graphics graphics = e.Graphics;
-        graphics.Clear(Theme.Surface);
+        graphics.Clear(BackColor);
+        graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
 
         List<GameListItem> visible = VisibleItems;
-        if (visible.Count == 0)
-        {
-            DrawEmptyState(graphics);
-            return;
-        }
 
         int first = Math.Max(0, _scrollOffset / RowHeight);
         int last = Math.Min(visible.Count - 1, (_scrollOffset + ClientSize.Height) / RowHeight);
@@ -124,22 +173,32 @@ public sealed class GameListControl : Control
         }
 
         DrawScrollbar(graphics, visible.Count);
+
+        // Whatever room is left under the rows holds a hint about what to do next.
+        int contentBottom = (visible.Count * RowHeight) - _scrollOffset;
+        DrawEmptyState(graphics, new Rectangle(0, contentBottom, ClientSize.Width, ClientSize.Height - contentBottom));
     }
 
     private void DrawRow(Graphics graphics, GameListItem item, Rectangle bounds, bool selected, bool hovered)
     {
+        var card = new Rectangle(bounds.X + 3, bounds.Y + 4, bounds.Width - 7, RowHeight - 9);
+
         if (selected)
         {
-            Theme.FillRounded(graphics,
-                new Rectangle(4, bounds.Y + 2, bounds.Width - 14, RowHeight - 4), 6, Theme.AccentDim);
+            Theme.DrawGlow(graphics, card, 12, Theme.Accent, 3);
+            Theme.FillRoundedGradient(graphics, card, 12,
+                Color.FromArgb(0x22, 0x55, 0xAE), Color.FromArgb(0x16, 0x3B, 0x80));
+            Theme.DrawRounded(graphics, card, 12, Focused ? Theme.AccentBright : Color.FromArgb(0x4A, 0x86, 0xF0), 1.5f);
         }
-        else if (hovered)
+        else
         {
-            Theme.FillRounded(graphics,
-                new Rectangle(4, bounds.Y + 2, bounds.Width - 14, RowHeight - 4), 6, Theme.SurfaceRaised);
+            Theme.FillRounded(graphics, card, 12, hovered ? Theme.SurfaceHover : Theme.SurfaceRaised);
+            Theme.DrawRounded(graphics, card, 12, hovered ? Theme.LineStrong : Theme.Line);
         }
 
-        var iconBounds = new Rectangle(14, bounds.Y + ((RowHeight - IconSize) / 2), IconSize, IconSize);
+        var iconBounds = new Rectangle(card.X + 14, card.Y + ((card.Height - IconSize) / 2), IconSize, IconSize);
+        Theme.FillRounded(graphics, iconBounds, 9, Theme.ScreenWell);
+        Theme.DrawRounded(graphics, iconBounds, 9, selected ? Color.FromArgb(0x3A, 0x6E, 0xC8) : Theme.Line);
 
         if (item.Icon is { } icon)
         {
@@ -147,7 +206,8 @@ public sealed class GameListControl : Control
             graphics.PixelOffsetMode = PixelOffsetMode.Half;
 
             // Icons are tiny and square-ish; fit them without distorting the aspect ratio.
-            float scale = Math.Min((float)IconSize / icon.Width, (float)IconSize / icon.Height);
+            const int inner = IconSize - 12;
+            float scale = Math.Min((float)inner / icon.Width, (float)inner / icon.Height);
             var drawWidth = (int)(icon.Width * scale);
             var drawHeight = (int)(icon.Height * scale);
 
@@ -156,38 +216,30 @@ public sealed class GameListControl : Control
                 iconBounds.Y + ((IconSize - drawHeight) / 2),
                 drawWidth,
                 drawHeight));
+
+            graphics.PixelOffsetMode = PixelOffsetMode.Default;
         }
         else
         {
-            Theme.FillRounded(graphics, iconBounds, 6, Theme.SurfaceRaised);
-
-            using var initialBrush = new SolidBrush(Theme.TextFaint);
-            using var format = new StringFormat
-            {
-                Alignment = StringAlignment.Center,
-                LineAlignment = StringAlignment.Center,
-            };
-
             string initial = item.Entry.Title.Length > 0 ? item.Entry.Title[..1].ToUpperInvariant() : "?";
-            graphics.DrawString(initial, Theme.TitleFont, initialBrush, iconBounds, format);
+            Theme.DrawText(graphics, initial, Theme.TitleFont, Theme.TextMuted, iconBounds,
+                TextFormatFlags.HorizontalCenter);
         }
 
-        int textLeft = iconBounds.Right + 12;
-        int textWidth = Math.Max(20, bounds.Width - textLeft - 20);
+        int textLeft = iconBounds.Right + 16;
+        int textWidth = Math.Max(20, card.Right - textLeft - 40);
 
-        using var titleBrush = new SolidBrush(item.Entry.JarExists ? Theme.Text : Theme.Danger);
-        using var subtitleBrush = new SolidBrush(Theme.TextMuted);
-        using var trim = new StringFormat(StringFormatFlags.NoWrap) { Trimming = StringTrimming.EllipsisCharacter };
+        Theme.DrawText(graphics, item.Entry.Title, Theme.TitleFont,
+            item.Entry.JarExists ? Theme.Text : Theme.Danger,
+            new Rectangle(textLeft, card.Y + 12, textWidth, 26));
 
-        graphics.DrawString(item.Entry.Title, Theme.UiFontBold, titleBrush,
-            new RectangleF(textLeft, bounds.Y + 11, textWidth, 18), trim);
+        string subtitle = item.Entry.JarExists ? Describe(item.Entry) : "File is missing";
+        Theme.DrawText(graphics, subtitle, Theme.SmallFont, selected ? Theme.Text : Theme.TextMuted,
+            new Rectangle(textLeft, card.Y + 38, textWidth, 20));
 
-        string subtitle = item.Entry.JarExists
-            ? Describe(item.Entry)
-            : "File is missing";
-
-        graphics.DrawString(subtitle, Theme.SmallFont, subtitleBrush,
-            new RectangleF(textLeft, bounds.Y + 30, textWidth, 16), trim);
+        Theme.DrawGlyph(graphics, Glyphs.ChevronRight, Theme.IconFontSmall,
+            selected ? Theme.Text : Theme.TextFaint,
+            new RectangleF(card.Right - 38, card.Y, 24, card.Height));
     }
 
     private static string Describe(LibraryEntry entry)
@@ -199,26 +251,33 @@ public sealed class GameListControl : Control
             ? $"{(int)played.TotalHours}h {played.Minutes}m played"
             : played.TotalMinutes >= 1
                 ? $"{(int)played.TotalMinutes}m played"
-                : "just started";
+                : "Just started";
 
-        return $"{entry.Vendor}  ·  {duration}";
+        return $"{entry.Vendor}  •  {duration}";
     }
 
-    private void DrawEmptyState(Graphics graphics)
+    private void DrawEmptyState(Graphics graphics, Rectangle area)
     {
-        using var brush = new SolidBrush(Theme.TextFaint);
-        using var format = new StringFormat
-        {
-            Alignment = StringAlignment.Center,
-            LineAlignment = StringAlignment.Center,
-        };
+        // Only worth drawing when there is room for the whole message; a sliver of it is noise.
+        if (area.Height < 190) return;
 
-        string message = _items.Count == 0
-            ? "Drop a .jar file here to add a game"
-            : "No games match that search";
+        (string heading, string detail) = _items.Count == 0
+            ? ("No games yet", "Click “Add Game” or drop .jar files\nhere to start playing.")
+            : VisibleItems.Count == 0
+                ? ("No games match", "Try a different search.")
+                : ("No more games here", "Click “Add Game” to load\nyour JAR files.");
 
-        graphics.DrawString(message, Theme.UiFont, brush,
-            new Rectangle(10, 0, ClientSize.Width - 20, ClientSize.Height), format);
+        int top = area.Y + ((area.Height - 170) / 2);
+        int cx = area.X + (area.Width / 2);
+
+        Theme.DrawLogoMark(graphics, new RectangleF(cx - 36, top, 72, 76), Theme.LineStrong);
+
+        Theme.DrawText(graphics, heading, HeadingFont, Theme.TextMuted,
+            new Rectangle(area.X + 10, top + 90, area.Width - 20, 26), TextFormatFlags.HorizontalCenter);
+
+        TextRenderer.DrawText(graphics, detail, Theme.UiFont,
+            new Rectangle(area.X + 10, top + 120, area.Width - 20, 50), Theme.TextFaint,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
     }
 
     private void DrawScrollbar(Graphics graphics, int count)
@@ -233,7 +292,7 @@ public sealed class GameListControl : Control
         int thumbTop = 4 + (maxScroll == 0 ? 0 : travel * _scrollOffset / maxScroll);
 
         Theme.FillRounded(graphics,
-            new Rectangle(ClientSize.Width - 7, thumbTop, 4, thumbHeight), 2, Theme.Line);
+            new Rectangle(ClientSize.Width - 4, thumbTop, 4, thumbHeight), 2, Theme.LineStrong);
     }
 
     // ---------------------------------------------------------------------------------

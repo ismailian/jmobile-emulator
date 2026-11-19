@@ -26,6 +26,7 @@ public sealed class PhoneScreenControl : Control
     private Bitmap? _bitmap;
     private GCHandle _pinned;
     private volatile bool _dirty;
+    private bool _flashing;
 
     public PhoneScreenControl()
     {
@@ -39,6 +40,7 @@ public sealed class PhoneScreenControl : Control
 
         BackColor = Theme.Background;
         TabStop = true;
+        AllowDrop = true;
     }
 
     /// <summary>How the phone screen is fitted into the available area.</summary>
@@ -48,6 +50,25 @@ public sealed class PhoneScreenControl : Control
     /// <summary>Draw the handset body and bezel around the screen.</summary>
     [DefaultValue(true)]
     public bool ShowSkin { get; set; } = true;
+
+    /// <summary>
+    /// Briefly lights the frame, which is how vibration is shown: a desktop cannot shake.
+    /// </summary>
+    public void Flash()
+    {
+        _flashing = true;
+        Invalidate();
+
+        var timer = new System.Windows.Forms.Timer { Interval = 140 };
+        timer.Tick += (_, _) =>
+        {
+            _flashing = false;
+            Invalidate();
+            timer.Stop();
+            timer.Dispose();
+        };
+        timer.Start();
+    }
 
     /// <summary>The rectangle the screen currently occupies, for hit-testing pointer events.</summary>
     public Rectangle ScreenBounds { get; private set; }
@@ -98,7 +119,7 @@ public sealed class PhoneScreenControl : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         Graphics graphics = e.Graphics;
-        graphics.Clear(Theme.Background);
+        graphics.Clear(Parent?.BackColor ?? Theme.Background);
 
         if (_surface is null || _bitmap is null)
         {
@@ -109,7 +130,7 @@ public sealed class PhoneScreenControl : Control
         Rectangle target = ComputeScreenBounds(_surface.Width, _surface.Height);
         ScreenBounds = target;
 
-        if (ShowSkin) DrawSkin(graphics, target);
+        if (ShowSkin) DrawFrame(graphics, Rectangle.Inflate(target, FrameInset, FrameInset));
 
         graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
         graphics.PixelOffsetMode = PixelOffsetMode.Half;
@@ -120,11 +141,17 @@ public sealed class PhoneScreenControl : Control
         {
             graphics.DrawImage(_bitmap, target);
         }
+
+        graphics.PixelOffsetMode = PixelOffsetMode.Default;
     }
+
+    // Space between the screen and the edge of its glowing frame, and between the frame and the control.
+    private const int FrameInset = 12;
+    private const int FrameMargin = 6;
 
     private Rectangle ComputeScreenBounds(int width, int height)
     {
-        int margin = ShowSkin ? 18 : 4;
+        int margin = ShowSkin ? FrameInset + FrameMargin : 2;
         int availableWidth = Math.Max(1, ClientSize.Width - (margin * 2));
         int availableHeight = Math.Max(1, ClientSize.Height - (margin * 2));
 
@@ -147,36 +174,38 @@ public sealed class PhoneScreenControl : Control
             Math.Max(1, scaledHeight));
     }
 
-    private static void DrawSkin(Graphics graphics, Rectangle screen)
+    /// <summary>The glowing frame the screen sits in: a soft halo, a dark well and a bright edge.</summary>
+    private void DrawFrame(Graphics graphics, Rectangle frame)
     {
-        var body = Rectangle.Inflate(screen, 14, 14);
-        Theme.FillRounded(graphics, body, 10, Theme.ShellBody);
+        Color edge = _flashing ? Theme.Warning : Color.FromArgb(0x3A, 0x72, 0xD0);
 
-        var bezel = Rectangle.Inflate(screen, 3, 3);
-        Theme.FillRounded(graphics, bezel, 3, Theme.ShellBezel);
+        Theme.DrawGlow(graphics, frame, 18, _flashing ? Theme.Warning : Theme.Accent, FrameMargin - 1);
+        Theme.FillRoundedGradient(graphics, frame, 18, Color.FromArgb(0x10, 0x20, 0x3C), Color.FromArgb(0x0A, 0x16, 0x2C));
+        Theme.DrawRounded(graphics, frame, 18, edge, 1.6f);
 
-        // A single highlight along the top edge reads as moulded plastic without being fussy.
-        using var highlight = new LinearGradientBrush(
-            new Rectangle(body.X, body.Y, body.Width, 3),
-            Color.FromArgb(60, 255, 255, 255),
-            Color.FromArgb(0, 255, 255, 255),
-            LinearGradientMode.Vertical);
-
-        graphics.FillRectangle(highlight, body.X + 8, body.Y + 1, body.Width - 16, 2);
+        var well = Rectangle.Inflate(frame, -(FrameInset - 3), -(FrameInset - 3));
+        Theme.FillRounded(graphics, well, 6, Theme.ScreenWell);
+        Theme.DrawRounded(graphics, well, 6, Color.FromArgb(0x1C, 0x34, 0x5E));
     }
 
     private void DrawPlaceholder(Graphics graphics)
     {
-        var bounds = new Rectangle(0, 0, ClientSize.Width, ClientSize.Height);
+        var frame = new Rectangle(FrameMargin, FrameMargin,
+            ClientSize.Width - (FrameMargin * 2) - 1, ClientSize.Height - (FrameMargin * 2) - 1);
+        if (frame.Width <= 40 || frame.Height <= 40) return;
 
-        using var brush = new SolidBrush(Theme.TextFaint);
-        using var format = new StringFormat
-        {
-            Alignment = StringAlignment.Center,
-            LineAlignment = StringAlignment.Center,
-        };
+        DrawFrame(graphics, frame);
+        graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
 
-        graphics.DrawString("No game running", Theme.UiFont, brush, bounds, format);
+        int cx = frame.X + (frame.Width / 2);
+        int top = frame.Y + (frame.Height / 2) - 90;
+
+        Theme.DrawLogoMark(graphics, new RectangleF(cx - 40, top, 80, 86), Theme.LineStrong);
+        Theme.DrawText(graphics, "No game running", Theme.TitleFont, Theme.TextMuted,
+            new Rectangle(frame.X, top + 104, frame.Width, 28), TextFormatFlags.HorizontalCenter);
+        Theme.DrawText(graphics, "Pick a game from the library and press Play, or drop a .jar here.",
+            Theme.UiFont, Theme.TextFaint,
+            new Rectangle(frame.X + 20, top + 136, frame.Width - 40, 24), TextFormatFlags.HorizontalCenter);
     }
 
     private void Release()
